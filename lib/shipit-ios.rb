@@ -3,6 +3,7 @@ require 'highline/import'
 require 'xcodeproj'
 require 'nokogiri'
 require 'plist'
+require 'fileutils'
 
 module ShipitIos
 
@@ -16,6 +17,7 @@ module ShipitIos
       @scheme         = options[:scheme]
       @configuration  = options[:configuration]
       @upload         = options[:upload]
+      @archive        = options[:archive]
       @verbose        = options[:verbose]
     end
 
@@ -23,6 +25,7 @@ module ShipitIos
       setup
       build
       shipit
+      archive
     end
 
     private
@@ -115,12 +118,13 @@ module ShipitIos
         [ipa_name, dsym_name].each do |f|
           files << f if File.exists?(f)
         end
+        files += Dir.glob("*.xcarchive")
         if files.length > 0
           puts "The following files look like they may be from a previous build:\n  #{files.join("\n  ")}"
           delete = agree("Delete them and build a new .ipa? (y/n)", true)
           if delete
             files.each do |f|
-              File.delete(f)
+              FileUtils.rm_r(f)
             end
           elsif files.include?(ipa_name)
             @keep_old_build = true
@@ -142,6 +146,7 @@ module ShipitIos
         puts "Building .ipa"
         puts "Build command:\n#{command}" if verbose
         puts `#{command}`
+        build_finished_time
         build_status = $?
         abort "Build failed -- aborting" unless build_status.success?
       end
@@ -154,6 +159,17 @@ module ShipitIos
           `#{command}`
         else
           puts "To upload your app to iTunes Connect, be sure to set the --upload option"
+        end
+      end
+
+      def archive
+        return unless @archive
+        archive_path = File.expand_path("~/Library/Developer/Xcode/Archives/#{build_date}/#{archive_name}")
+        if File.exists?(archive_path)
+          puts "Copying xcarchive from #{archive_path}" if verbose
+          `cp -r '#{archive_path}' '#{archive_name}'`
+        else
+          puts "Unable to locate #{archive_name} in #{File.dirname(archive_path)}"
         end
       end
 
@@ -211,6 +227,22 @@ module ShipitIos
 
       def build_status
         @build_status
+      end
+
+      def build_finished_time
+        @build_finished_time ||= DateTime.now
+      end
+
+      def build_date
+        build_finished_time.strftime("%Y-%m-%d").strip
+      end
+
+      def build_time
+        build_finished_time.strftime("%l.%M %p").strip
+      end
+
+      def archive_name
+        "#{product_name} #{build_date}, #{build_time}.xcarchive"
       end
 
       def plist

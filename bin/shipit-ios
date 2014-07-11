@@ -28,6 +28,10 @@ OptionParser.new do |opts|
     options[:upload] = u
   end
 
+  opts.on("-a", "--archive", "Create xcarchive in current directory") do |a|
+    options[:archive] = a
+  end
+
   opts.on("-v", "--verbose", "Run verbosely") do |v|
     options[:verbose] = v
   end

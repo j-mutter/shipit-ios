@@ -152,18 +152,57 @@ module ShipitIos
       end
 
       def shipit
-        puts "Uploading previous build..." if @upload_old_build
         command = "xcrun -sdk iphoneos Validation -online -upload -verbose #{product_name}.ipa"
-        puts "Upload command:\n #{command}" if verbose
+        puts "Upload command:\n#{command}" if verbose
         if upload
+          check_keychain
+          puts "Uploading previous build..." if @upload_old_build
           `#{command}`
         else
           puts "To upload your app to iTunes Connect, be sure to set the --upload option"
         end
       end
 
+      def check_keychain
+        search_results = find_keychain_password
+        if $?.success?
+          account = search_results.split.find {|line| line =~ /acct/}.split('"').last
+          puts "Found a keychain item for iTunes Connect account: #{account}"
+          if !agree("Use this account for upload? (y/n)", true)
+            delete_keychain_password(account)
+          else
+            return
+          end
+        end
+        puts "I need to add your iTunes Connect credentials to upload your build..."
+        create_keychain_password
+      end
+
+      def find_keychain_password(account=nil)
+        options = account ? {:a => account} : {}
+        run_keychain_command(:find, options)
+      end
+
+      def create_keychain_password
+        account = ask("iTunes Connect username/email: ")
+        password = ask("Password for #{account}: ") { |q| q.echo = false }
+        run_keychain_command(:add, {:a => account, :w => password, :U => nil})
+      end
+
+      def delete_keychain_password(account=nil)
+        options = account ? {:a => account} : {}
+        run_keychain_command(:delete, options)
+      end
+
+      def run_keychain_command(cmd='find', options={})
+        command = "security #{cmd}-generic-password -s Xcode:itunesconnect.apple.com "
+        command << options.map {|k,v| "-#{k} #{v}".strip}.join(' ')
+        puts "Running keychain command:\n#{command}" if verbose
+        `#{command}`
+      end
+
       def archive
-        return unless @archive
+        return unless @archive && !@keep_old_build
         archive_path = File.expand_path("~/Library/Developer/Xcode/Archives/#{build_date}/#{archive_name}")
         if File.exists?(archive_path)
           puts "Copying xcarchive from #{archive_path}" if verbose

@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'highline/import'
+require 'shipit-ios'
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: shipit-ios [ --workspace workspacename | --project projectname ] --scheme schemename --configuration configurationname [options]"
+
+  opts.on("-w", "--workspace workspacename", "Xcode Workspace to use (required, or specify a project) ") do |w|
+    options[:workspace] = w
+  end
+
+  opts.on("-p", "--project projectname", "Xcode project to use (required, or specify a workspace)") do |p|
+    options[:project] = p
+  end
+
+  opts.on("-s", "--scheme schemename", "Scheme to build (required)") do |s|
+    options[:scheme] = s
+  end
+
+  opts.on("-c", "--configuration configurationname", "Build configuration (optional, defaults to Xcode project default)") do |c|
+    options[:configuration] = c
+  end
+
+  opts.on("-u", "--upload", "Actually upload the app to iTunes Connect") do |u|
+    options[:upload] = u
+  end
+
+  opts.on("-v", "--verbose", "Run verbosely") do |v|
+    options[:verbose] = v
+  end
+
+end.parse!
+
+ship = ShipitIos::Ship.new(options)
+ship.it
